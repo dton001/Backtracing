@@ -16,17 +16,10 @@ class Sudoku:
             grid.append(row)
         return grid
 
-    def remove_row_values(self, arr, x):
-        # remove elements that appear in the row
+    def remove_values(self, arr, x, style):
         for i in range(9):
-            num = self.puzzle[x][i]
-            if num in arr:
-                arr.remove(num)
-
-    def remove_column_values(self, arr, y):
-        # remove elements that appear in the column
-        for i in range(9):
-            num = self.puzzle[i][y]
+            # remove elements that appear in row or column
+            num = (self.puzzle[x][i] if style == 'row' else self.puzzle[i][x])
             if num in arr:
                 arr.remove(num)
 
@@ -78,8 +71,8 @@ class Sudoku:
         possible_values = [x for x in range(1, 10)]
 
         # removing values that are already used
-        self.remove_row_values(possible_values, x)
-        self.remove_column_values(possible_values, y)
+        self.remove_values(possible_values, x, 'row')
+        self.remove_values(possible_values, y, 'column')
         self.remove_box_values(possible_values, x, y)
 
         for value in possible_values:
