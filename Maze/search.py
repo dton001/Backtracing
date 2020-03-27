@@ -74,41 +74,34 @@ class Search:
         x, y = self.find_beginning()
 
         # after finding where to start recursion to locate x
-        return self.search_path(x, y)
+        return self.search_path(x, y, 0)
 
-    def search_path(self, x, y, prev_move=None):
-        # found x so we are finished
+    def search_path(self, x, y, path_length):
+        # found x so we are finished, extra value needs to be removed from path_length
         if self.maze[x][y] == 'x':
+            self.path_num = path_length - 1
             return True
 
-        moves = [UP, DOWN, LEFT, RIGHT]
+        # order determine best to traverse maze
+        moves = [RIGHT, DOWN, LEFT, UP]
 
         # remove moves that are illegal
         self.remove_impossible_moves(x, y, moves)
 
-        # ensures that we do not test the previous block or continuous recursion will occur
-        if prev_move == UP:
-            moves.remove(DOWN)
-        elif prev_move == DOWN:
-            moves.remove(UP)
-        elif prev_move == LEFT:
-            moves.remove(RIGHT)
-        elif prev_move == RIGHT:
-            moves.remove(LEFT)
-
         for move in moves:
             temp_x, temp_y = self.search_spot(x, y, move)
 
-            # x is not a number so we need to check for that
-            is_num = self.maze[temp_x][temp_y].isdigit()
-            if is_num:
-                self.path_num = self.path_num + int(self.maze[temp_x][temp_y])
+            # spot has been visited so remove it from being revisited
+            # cannot override 'x' endpoint
+            if self.maze[temp_x][temp_y] is not 'x':
+                self.maze[temp_x][temp_y] = '0'
 
             # continues recursion until 'x marks the stop'
-            if self.search_path(temp_x, temp_y, prev_move=move):
+            if self.search_path(temp_x, temp_y, path_length + 1):
                 return True
-            if is_num:
-                self.path_num = self.path_num - int(self.maze[temp_x][temp_y])
+
+            # taken path was not correct to reopen closed path
+            self.maze[temp_x][temp_y] = '1'
         return False
 
     def print_path_length(self):
