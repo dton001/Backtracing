@@ -2,6 +2,8 @@
 # Staring position is b, ending position is x, 0 are walls and 1 is a path tile
 # Find the length from b to x
 
+import sys
+
 UP = 0
 DOWN = 1
 LEFT = 2
@@ -32,6 +34,12 @@ class Search:
         self.row_num = len(self.maze)
         self.column_num = len(self.maze[0])
 
+    def print_maze(self, maze):
+        for row in maze:
+            for value in row:
+                print(value, end=' ')
+            print()
+
     def find_beginning(self):
         # finds the start of the maze
         for x in range(self.row_num):
@@ -39,13 +47,13 @@ class Search:
                 if self.maze[x][y] == 'b':
                     return x, y
 
-    def remove_impossible_moves(self, x, y, moves):
+    def remove_impossible_moves(self, maze, x, y, moves):
         # removes that moves that go out of bounds or hits walls
         for move in range(4):
-            if not self.search_spot(x, y, move):
+            if not self.search_spot(maze, x, y, move):
                 moves.remove(move)
 
-    def search_spot(self, x, y, move):
+    def search_spot(self, maze, x, y, move):
         # checks the array for what moves will be legal
         # return positions if legal else False
         if move == UP:
@@ -65,43 +73,73 @@ class Search:
             if y >= self.column_num:
                 return False
 
-        if self.maze[x][y] == '0':
+        if maze[x][y] == '0':
             return False
 
         return x, y
 
     def traverse(self):
+        smallest_path = sys.maxsize
+        found_path = False
         x, y = self.find_beginning()
 
-        # after finding where to start recursion to locate x
-        return self.search_path(x, y, 0)
+        # order determine best to traverse maze
+        # avoid having two opposing directions next to each other
+        set_of_moves = [
+            [RIGHT, DOWN, LEFT, UP], [RIGHT, UP, LEFT, DOWN], [DOWN, RIGHT, UP, LEFT],
+            [LEFT, DOWN, RIGHT, UP], [LEFT, UP, RIGHT, DOWN], [UP, RIGHT, DOWN, LEFT],
+            [DOWN, LEFT, UP, RIGHT], [UP, LEFT, DOWN, RIGHT]
+        ]
 
-    def search_path(self, x, y, path_length):
+        # test each set priority moves
+        for moves in set_of_moves:
+
+            # make a hard copy of the puzzle for repeat testing
+            temp_maze = []
+            for row in self.maze:
+                temp_row = []
+                for value in row:
+                    temp_row.append(value)
+                temp_maze.append(temp_row)
+
+            # main path finding function
+            found_path = self.search_path(temp_maze, x, y, 0, moves)
+
+            # keeps track of the shortest path length
+            if smallest_path > self.path_num:
+                smallest_path = self.path_num
+
+        self.path_num = smallest_path
+        return found_path
+
+    def search_path(self, maze, x, y, path_length, set_of_moves):
         # found x so we are finished, extra value needs to be removed from path_length
-        if self.maze[x][y] == 'x':
+        if maze[x][y] == 'x':
             self.path_num = path_length - 1
             return True
 
-        # order determine best to traverse maze
-        moves = [RIGHT, DOWN, LEFT, UP]
+        # hard copy of set of moves to continue testing this set of direction
+        moves = []
+        for move in set_of_moves:
+            moves.append(move)
 
         # remove moves that are illegal
-        self.remove_impossible_moves(x, y, moves)
+        self.remove_impossible_moves(maze, x, y, moves)
 
         for move in moves:
-            temp_x, temp_y = self.search_spot(x, y, move)
+            temp_x, temp_y = self.search_spot(maze, x, y, move)
 
             # spot has been visited so remove it from being revisited
             # cannot override 'x' endpoint
-            if self.maze[temp_x][temp_y] is not 'x':
-                self.maze[temp_x][temp_y] = '0'
+            if maze[temp_x][temp_y] is not 'x':
+                maze[temp_x][temp_y] = '0'
 
             # continues recursion until 'x marks the stop'
-            if self.search_path(temp_x, temp_y, path_length + 1):
+            if self.search_path(maze, temp_x, temp_y, path_length + 1, set_of_moves):
                 return True
 
-            # taken path was not correct to reopen closed path
-            self.maze[temp_x][temp_y] = '1'
+            # taken path was not correct so reopen closed path
+            maze[temp_x][temp_y] = '1'
         return False
 
     def print_path_length(self):
