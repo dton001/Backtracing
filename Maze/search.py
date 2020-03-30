@@ -14,7 +14,7 @@ class Search:
     maze = []
     row_num = 0
     column_num = 0
-    path_num = 0
+    path_num = sys.maxsize
 
     def __init__(self, filename):
         self.read_file(filename)
@@ -79,7 +79,6 @@ class Search:
         return x, y
 
     def traverse(self):
-        smallest_path = sys.maxsize
         found_path = False
         x, y = self.find_beginning()
 
@@ -104,20 +103,9 @@ class Search:
 
             # main path finding function
             found_path = self.search_path(temp_maze, x, y, 0, moves)
-
-            # keeps track of the shortest path length
-            if smallest_path > self.path_num:
-                smallest_path = self.path_num
-
-        self.path_num = smallest_path
         return found_path
 
     def search_path(self, maze, x, y, path_length, set_of_moves):
-        # found x so we are finished, extra value needs to be removed from path_length
-        if maze[x][y] == 'x':
-            self.path_num = path_length - 1
-            return True
-
         # hard copy of set of moves to continue testing this set of direction
         moves = []
         for move in set_of_moves:
@@ -129,10 +117,15 @@ class Search:
         for move in moves:
             temp_x, temp_y = self.search_spot(maze, x, y, move)
 
+            # found x so we are finished, extra value needs to be removed from path_length
+            if maze[temp_x][temp_y] == 'x':
+                # keep track of shortest path length
+                if self.path_num > path_length:
+                    self.path_num = path_length
+                return True
+
             # spot has been visited so remove it from being revisited
-            # cannot override 'x' endpoint
-            if maze[temp_x][temp_y] is not 'x':
-                maze[temp_x][temp_y] = '0'
+            maze[temp_x][temp_y] = '0'
 
             # continues recursion until 'x marks the stop'
             if self.search_path(maze, temp_x, temp_y, path_length + 1, set_of_moves):
