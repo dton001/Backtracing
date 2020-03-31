@@ -15,6 +15,7 @@ class Search:
     row_num = 0
     column_num = 0
     path_num = sys.maxsize
+    visited_spots = []
 
     def __init__(self, filename):
         self.read_file(filename)
@@ -47,13 +48,13 @@ class Search:
                 if self.maze[x][y] == 'b':
                     return x, y
 
-    def remove_impossible_moves(self, maze, x, y, moves):
+    def remove_impossible_moves(self, x, y, moves):
         # removes that moves that go out of bounds or hits walls
         for move in range(4):
-            if not self.search_spot(maze, x, y, move):
+            if not self.search_spot(x, y, move):
                 moves.remove(move)
 
-    def search_spot(self, maze, x, y, move):
+    def search_spot(self, x, y, move):
         # checks the array for what moves will be legal
         # return positions if legal else False
         if move == UP:
@@ -73,7 +74,8 @@ class Search:
             if y >= self.column_num:
                 return False
 
-        if maze[x][y] == '0':
+        # if self.maze[x][y] == '0':
+        if (x, y) in self.visited_spots or self.maze[x][y] == '0':
             return False
 
         return x, y
@@ -92,47 +94,41 @@ class Search:
 
         # test each set priority moves
         for moves in set_of_moves:
-
-            # make a hard copy of the puzzle for repeat testing
-            temp_maze = []
-            for row in self.maze:
-                temp_row = []
-                for value in row:
-                    temp_row.append(value)
-                temp_maze.append(temp_row)
+            self.visited_spots.clear()
+            self.visited_spots.append((x, y))
 
             # main path finding function
-            found_path = self.search_path(temp_maze, x, y, 0, moves)
+            found_path = self.search_path(x, y, 0, moves)
         return found_path
 
-    def search_path(self, maze, x, y, path_length, set_of_moves):
+    def search_path(self, x, y, path_length, set_of_moves):
         # hard copy of set of moves to continue testing this set of direction
         moves = []
         for move in set_of_moves:
             moves.append(move)
 
         # remove moves that are illegal
-        self.remove_impossible_moves(maze, x, y, moves)
+        self.remove_impossible_moves(x, y, moves)
 
         for move in moves:
-            temp_x, temp_y = self.search_spot(maze, x, y, move)
+            temp_x, temp_y = self.search_spot(x, y, move)
 
             # found x so we are finished, extra value needs to be removed from path_length
-            if maze[temp_x][temp_y] == 'x':
+            if self.maze[temp_x][temp_y] == 'x':
                 # keep track of shortest path length
                 if self.path_num > path_length:
                     self.path_num = path_length
                 return True
 
-            # spot has been visited so remove it from being revisited
-            maze[temp_x][temp_y] = '0'
+            # add spot to visited spot array
+            self.visited_spots.append((temp_x, temp_y))
 
             # continues recursion until 'x marks the stop'
-            if self.search_path(maze, temp_x, temp_y, path_length + 1, set_of_moves):
+            if self.search_path(temp_x, temp_y, path_length + 1, set_of_moves):
                 return True
 
-            # taken path was not correct so reopen closed path
-            maze[temp_x][temp_y] = '1'
+            # taken path was not correct so remove visited spot from array
+            self.visited_spots.remove((temp_x, temp_y))
         return False
 
     def print_path_length(self):
