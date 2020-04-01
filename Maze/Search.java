@@ -1,4 +1,7 @@
-package test;
+# Given a maze from a textfile
+# Staring position is b, ending position is x, 0 are walls and 1 is a path tile
+# Find the length from b to x
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -6,6 +9,8 @@ import java.io.IOException;
 
 public class Search {
 	char[][] grid;
+	int[][] visited_spots;
+	int visited_spot_counter = 1;
 	int row_num = 0;
 	int column_num = 0;
 	int path_length = Integer.MAX_VALUE;
@@ -66,6 +71,29 @@ public class Search {
 		return removed;
 	}
 
+	private int[][] remove_from_array(int[][] l, int value) {
+		int[][] removed = new int[this.column_num * this.row_num][2];
+		int offset = 0;
+
+		// removes value from array
+		for(int i = 0; i < this.visited_spot_counter; i++) {
+			if(i == value) {
+				offset = 1;
+				continue;
+			}
+			removed[i] = l[i + offset];
+		}
+
+		return removed;
+	}
+
+	private boolean contains(int[][] l, int[] a) {
+		for(int i = 0; i < this.visited_spot_counter; i++)
+			if(l[i][0] == a[0] && l[i][1] == a[1])
+				return true;
+		return false;
+	}
+
 	private int[] search_for_start() {
 		// search for start point
 		int[] start_index = new int[2];
@@ -78,19 +106,20 @@ public class Search {
 		return start_index;
 	}
 
-	private int[] valid_moves(char[][] grid, int x, int y, int[] moves) {
+	private int[] valid_moves(int x, int y, int[] moves) {
 		// remove moves that will be out of bounds or hit a wall
 		for(int i = 0; i < 4; i++) {
 			int[] new_index = this.preform_move(x, y, i);
+
 			if(
-			    (new_index[0] < 0 || new_index[0] == this.row_num) ||
-			    (new_index[1] < 0 || new_index[1] == this.column_num)
+				(new_index[0] < 0 || new_index[0] == this.row_num) ||
+				(new_index[1] < 0 || new_index[1] == this.column_num)
 			) {
 				moves = this.remove_from_array(moves, i);
 				continue;
 			}
 
-			if(grid[new_index[0]][new_index[1]] == '0')
+			if(this.grid[new_index[0]][new_index[1]] == '0' || this.contains(this.visited_spots, new_index))
 				moves = this.remove_from_array(moves, i);
 		}
 		return moves;
@@ -124,30 +153,25 @@ public class Search {
 		};
 
 		for(int m = 0; m < movements.length; m++) {
-			// deep copy of grid for multiple executions
-			char[][] recur_grid = new char[this.row_num][this.column_num];
-			for(int i = 0; i < this.row_num; i++) {
-				char[] temp_row = new char[this.column_num];
-				for(int j = 0; j < this.column_num; j++)
-					temp_row[j] = this.grid[i][j];
-				recur_grid[i] = temp_row;
-			}
-
-			found_path = this.solve_maze(recur_grid, start_index[0], start_index[1], 0, movements[m]);
+			// worst case we have to visit every spot on maze
+			this.visited_spots = new int[this.row_num * this.column_num][2];
+			this.visited_spots[0] = start_index;
+			this.visited_spot_counter = 1;
+			found_path = this.solve_maze(start_index[0], start_index[1], 0, movements[m]);
 		}
 		return found_path;
 	}
 
-	private boolean solve_maze(char[][] grid, int x, int y, int length, int[] moves) {
+	private boolean solve_maze(int x, int y, int length, int[] moves) {
 		// keep valid moves
-		int[] valid_moves = this.valid_moves(grid, x, y, moves);
+		int[] valid_moves = this.valid_moves(x, y, moves);
 
 		for(int i = 0; i < valid_moves.length; i++) {
 			// perform move
 			int[] index = this.preform_move(x,  y,  valid_moves[i]);
 
 			// when endpoint is found, then we are done
-			if(grid[index[0]][index[1]] == 'x') {
+			if(this.grid[index[0]][index[1]] == 'x') {
 
 				// maintain the shortest path
 				if(this.path_length > length)
@@ -156,14 +180,16 @@ public class Search {
 			}
 
 			// spot has been visited so we will close it
-			grid[index[0]][index[1]] = '0';
+			this.visited_spots[this.visited_spot_counter] = index;
+			this.visited_spot_counter++;
 
 			// main recursion path finding method
-			if(this.solve_maze(grid, index[0], index[1], length + 1, moves))
+			if(this.solve_maze(index[0], index[1], length + 1, moves))
 				return true;
 
 			// spot visited does not lead to endpoint so we open it
-			grid[index[0]][index[1]] = '1';
+			this.visited_spots = this.remove_from_array(this.visited_spots, this.visited_spot_counter);
+			this.visited_spot_counter--;
 
 		}
 		return false;
