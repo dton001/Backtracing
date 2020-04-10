@@ -8,21 +8,40 @@ import java.io.FileReader;
 import java.io.IOException;
 
 public class Search {
+	public class Node{
+		int[] index = new int[2];
+		Node parent = null;
+		int g;
+		int f;
+
+		public Node(int[] index, Node parent) {
+			this.index[0] = index[0];
+			this.index[1] = index[1];
+			this.parent = parent;
+			this.g = 0;
+			this.f = 0;
+		}
+
+		public boolean equals(Node n) {
+			 return this.index[0] == n.index[0] && this.index[1] == n.index[1] ? true : false;
+		}
+	}
+
 	char[][] grid;
-	int[][] visited_spots;
-	int visited_spot_counter = 1;
+	Node[] open_arr;
+	Node[] closed_arr;
+	Node[] path;
 	int row_num = 0;
 	int column_num = 0;
-	int path_length = Integer.MAX_VALUE;
+	int open_counter = 0;
+	int closed_counter = 0;
 
-	private int UP = 0;
-	private int DOWN = 1;
-	private int LEFT = 2;
-	private int RIGHT = 3;
-
-	public Search(String filename) throws IOException {
+	public Search2(String filename) throws IOException {
 		// setup maze puzzle
 		this.read_file(filename);
+
+		this.open_arr = new Node[this.row_num * this.column_num];
+		this.closed_arr = new Node[this.row_num * this.column_num];
 	}
 
 	public void read_file(String file_name) throws IOException {
@@ -56,143 +75,177 @@ public class Search {
 		br.close();
 	}
 
-	public void print_path_length() {
-		System.out.println(this.path_length);
-	}
+	public int[] find_point(String s) {
+		// find start and end point
+		char c = s.equals("begin") ? 'b' : 'x';
+		int[] index = new int[2];
 
-	private int[] remove_from_array(int[] l, int value) {
-		int[] removed = new int[l.length - 1];
-		// removes value from array
-		for(int i = 0; i < l.length; i++)
-			if(l[i] == value) {
-				 System.arraycopy(l, 0, removed, 0, i);
-				 System.arraycopy(l, i+1, removed, i, l.length - i - 1);
-			}
-		return removed;
-	}
-
-	private int[][] remove_from_array(int[][] l, int value) {
-		int[][] removed = new int[this.column_num * this.row_num][2];
-		int offset = 0;
-
-		// removes value from array
-		for(int i = 0; i < this.visited_spot_counter; i++) {
-			if(i == value) {
-				offset = 1;
-				continue;
-			}
-			removed[i] = l[i + offset];
-		}
-
-		return removed;
-	}
-
-	private boolean contains(int[][] l, int[] a) {
-		for(int i = 0; i < this.visited_spot_counter; i++)
-			if(l[i][0] == a[0] && l[i][1] == a[1])
-				return true;
-		return false;
-	}
-
-	private int[] search_for_start() {
-		// search for start point
-		int[] start_index = new int[2];
 		for(int i = 0; i < this.row_num; i++)
 			for(int j = 0; j < this.column_num; j++)
-				if(this.grid[i][j] == 'b') {
-					start_index[0] = i;
-					start_index[1] = j;
+				if(this.grid[i][j] == c) {
+					index[0] = i;
+					index[1] = j;
 				}
-		return start_index;
+
+		return index;
 	}
 
-	private int[] valid_moves(int x, int y, int[] moves) {
-		// remove moves that will be out of bounds or hit a wall
-		for(int i = 0; i < 4; i++) {
-			int[] new_index = this.preform_move(x, y, i);
+	private int find_shortest_distance() {
+		// find index of the node with the smallest f cost
+		int max = Integer.MAX_VALUE, index = -1;
 
-			if(
-				(new_index[0] < 0 || new_index[0] == this.row_num) ||
-				(new_index[1] < 0 || new_index[1] == this.column_num)
-			) {
-				moves = this.remove_from_array(moves, i);
+		for(int i = 0; i < this.open_counter; i++) {
+			if(max > this.open_arr[i].f) {
+				max = this.open_arr[i].f;
+				index = i;
+			}
+		}
+		return index;
+	}
+
+	private Node[] remove_index(Node[] list, int index) {
+		// remove node at index from the list
+		Node[] new_list = new Node[list.length];
+		int counter = 0;
+
+		for(int i = 0; i < this.open_counter; i++) {
+			if(index == i) {
+				// index is hit, so increase counter and loop back to for loop
+				counter++;
 				continue;
 			}
-
-			if(this.grid[new_index[0]][new_index[1]] == '0' || this.contains(this.visited_spots, new_index))
-				moves = this.remove_from_array(moves, i);
+			// if we did not hit index then makes no difference
+			// if we did hit index, then after skip, we need to go back one in new list
+			new_list[i - counter] = list[i];
 		}
-		return moves;
+		return new_list;
 	}
 
-	private int[] preform_move(int x, int y, int move) {
-		switch(move) {
-			case 0: x++;	//up
-				break;
-			case 1: x--;	//down
-				break;
-			case 2: y--;	//left
-				break;
-			case 3: y++;	//right
-				break;
+	private int index(String arr_name, Node n) {
+		// find index of node in array
+		Node[] temp = arr_name.equals("open") ? this.open_arr : this.closed_arr;
+		int counter = arr_name.equals("open") ? this.open_counter : this.closed_counter;
+
+		for(int i = 0; i < counter; i++)
+			if(temp[i].equals(n))
+				return i;
+		return -1;
+	}
+
+	private Node[] find_neighbor(Node curr) {
+		// look viablity of each neighbor to current node
+		Node[] neighbor = new Node[4];
+
+		for(int i = 0, neighbor_counter = 0; i < 4; i++) {
+			int x = curr.index[0], y = curr.index[1];
+			switch(i) {
+				case 0: x++;
+					break;
+				case 1: x--;
+					break;
+				case 2: y++;
+					break;
+				case 3: y--;
+					break;
+			}
+
+			// make sure x and y are both still in bounds of grid
+			if((x < 0 || x >= this.row_num) || (y < 0 || y >= this.column_num))
+				continue;
+
+			// see if index is a wall
+			if(this.grid[x][y] == '0')
+				continue;
+
+			int[] index = {x, y};
+			Node new_node = new Node(index, curr);
+
+			// check that new node is not in closed array
+			if(this.index("closed", new_node) != -1)
+				continue;
+
+			// index is within bounds and node is not in closed array, so add it to neighbor array
+			neighbor[neighbor_counter] = new_node;
+			neighbor_counter++;
 		}
-		int[] new_index = {x, y};
-		return new_index;
+		return neighbor;
+	}
+
+	public int distance(Node n1, Node n2) {
+		// calculate the distance between two nodes
+		return Math.abs(n1.index[0] - n2.index[0]) + Math.abs(n1.index[1] - n2.index[1]);
 	}
 
 	public boolean search_path() {
-		boolean found_path = false;
-		int[] start_index = this.search_for_start();
+		// find the start and end points
+		Node start_node = new Node(this.find_point("begin"), null);
+		Node end_node = new Node(this.find_point("end"), null);
 
-		// priority movements will determine path lengths
-		int[][] movements = {
-			{this.RIGHT, this.DOWN, this.LEFT, this.UP}, {this.LEFT, this.DOWN, this.RIGHT, this.UP},
-			{this.RIGHT, this.UP, this.LEFT, this.DOWN}, {this.LEFT, this.UP, this.RIGHT, this.DOWN},
-			{this.UP, this.RIGHT, this.DOWN, this.LEFT}, {this.DOWN, this.RIGHT, this.UP, this.LEFT},
-			{this.UP, this.LEFT, this.DOWN, this.RIGHT}, {this.DOWN, this.LEFT, this.UP, this.RIGHT}
-		};
+		// append start_node to open_list to start the loop
+		this.open_arr[this.open_counter] = start_node;
+		this.open_counter++;
 
-		for(int m = 0; m < movements.length; m++) {
-			// worst case we have to visit every spot on maze
-			this.visited_spots = new int[this.row_num * this.column_num][2];
-			this.visited_spots[0] = start_index;
-			this.visited_spot_counter = 1;
-			found_path = this.solve_maze(start_index[0], start_index[1], 0, movements[m]);
-		}
-		return found_path;
-	}
+		while(this.open_counter != 0) {
+			// find node with the lowest f cost
+			int index = this.find_shortest_distance();
+			Node curr = this.open_arr[index];
 
-	private boolean solve_maze(int x, int y, int length, int[] moves) {
-		// keep valid moves
-		int[] valid_moves = this.valid_moves(x, y, moves);
+			// current node is removed from open array and appended to closed array
+			this.open_arr = this.remove_index(this.open_arr, index);
+			this.open_counter--;
+			this.closed_arr[this.closed_counter] = curr;
+			this.closed_counter++;
+			Node[] neighbors;
 
-		for(int i = 0; i < valid_moves.length; i++) {
-			// perform move
-			int[] index = this.preform_move(x,  y,  valid_moves[i]);
+			// we hit the end point
+			if(curr.equals(end_node)) {
+				// worst case for path length is number of nodes in closed path
+				this.path = new Node[this.closed_counter];
+				int i = 0;
 
-			// when endpoint is found, then we are done
-			if(this.grid[index[0]][index[1]] == 'x') {
-
-				// maintain the shortest path
-				if(this.path_length > length)
-					this.path_length = length;
+				// construct the array of indexes hit
+				for(Node iter = curr; iter != null; iter = iter.parent, i++)
+					this.path[i] = iter;
 				return true;
 			}
+			else {
+				// not at endpoint so look at neighbors
+				neighbors = this.find_neighbor(curr);
+			}
+			for(int i = 0; i < neighbors.length; i++) {
+				// only look at elements in neighbors that have a value
+				if(neighbors[i] != null) {
 
-			// spot has been visited so we will close it
-			this.visited_spots[this.visited_spot_counter] = index;
-			this.visited_spot_counter++;
+					// updating distance from neighbor to start
+					neighbors[i].g++;
 
-			// main recursion path finding method
-			if(this.solve_maze(index[0], index[1], length + 1, moves))
-				return true;
+					// updating distance from neighbor to start + neighbor to distance
+					neighbors[i].f = neighbors[i].g + this.distance(neighbors[i], end_node);
 
-			// spot visited does not lead to endpoint so we open it
-			this.visited_spots = this.remove_from_array(this.visited_spots, this.visited_spot_counter);
-			this.visited_spot_counter--;
+					// see if node is already in open array
+					index = this.index("open", neighbors[i]);
+					if(index != -1)
+						// if node in open list but has higher f cost then ignore current neighbor
+						if(neighbors[i].f > this.open_arr[index].f)
+							continue;
 
+					// neighbor either is not in open list or has a shorter f cost we add neighbor
+					this.open_arr[this.open_counter] = neighbors[i];
+					this.open_counter++;
+				}
+			}
 		}
 		return false;
+	}
+
+	public void print_path() {
+		int size = 0;
+		for(int i = this.path.length - 1; i != 0; i--)
+			if(this.path[i] != null) {
+				System.out.println(this.path[i].index[0] + " " + this.path[i].index[1]);
+				size++;
+			}
+		System.out.println(size);
 	}
 
 	public static void main(String[] args) {
@@ -200,7 +253,7 @@ public class Search {
 			String filename = "path_to\\maze.txt";
 			Search search = new Search(filename);
 			if(search.search_path())
-				search.print_path_length();
+				search.print_path();
 			else
 				System.out.print("no solution");
 		} catch (IOException e) {

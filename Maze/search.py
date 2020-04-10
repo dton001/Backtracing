@@ -10,12 +10,24 @@ LEFT = 2
 RIGHT = 3
 
 
+class Node:
+    def __init__(self, index=None, parent=None):
+        self.index = index
+        self.parent = parent
+
+        # distance from start node
+        self.g = 0
+        # distance from start node + distance from end node
+        self.f = 0
+
+
 class Search:
     maze = []
     row_num = 0
     column_num = 0
-    path_num = sys.maxsize
-    visited_spots = []
+    open_spots = []
+    closed_spots = []
+    path = []
 
     def __init__(self, filename):
         self.read_file(filename)
@@ -35,109 +47,127 @@ class Search:
         self.row_num = len(self.maze)
         self.column_num = len(self.maze[0])
 
-    def print_maze(self, maze):
-        for row in maze:
-            for value in row:
-                print(value, end=' ')
-            print()
+    def find_points(self, start_end):
+        # find start and end points
+        for i in range(self.row_num):
+            for j in range(self.column_num):
+                c = 'b' if start_end is 'begin' else 'x'
+                if self.maze[i][j] is c:
+                    return i, j
 
-    def find_beginning(self):
-        # finds the start of the maze
-        for x in range(self.row_num):
-            for y in range(self.column_num):
-                if self.maze[x][y] == 'b':
-                    return x, y
+    def smallest_distance(self):
+        # returns node with lowest f cost in open list
+        distance = sys.maxsize
+        smallest = None
+        for spot in self.open_spots:
+            if distance > spot.f:
+                smallest = spot
+                distance = spot.f
+        return smallest
 
-    def remove_impossible_moves(self, x, y, moves):
-        # removes that moves that go out of bounds or hits walls
-        for move in range(4):
-            if not self.search_spot(x, y, move):
-                moves.remove(move)
+    def find_neighbors(self, curr, neighbors):
+        # looks all neighbors to current node
+        for i in range(4):
+            self.confirm_neighbor(curr, i, neighbors)
 
-    def search_spot(self, x, y, move):
-        # checks the array for what moves will be legal
-        # return positions if legal else False
-        if move == UP:
-            x = x - 1
-            if x < 0:
-                return False
-        elif move == DOWN:
+    def confirm_neighbor(self, curr, move, neighbors):
+        # helper function to confirm neighbor is appropriate
+        x = curr.index[0]
+        y = curr.index[1]
+        if move is UP:
             x = x + 1
-            if x >= self.row_num:
-                return False
-        elif move == LEFT:
+        elif move is DOWN:
+            x = x - 1
+        elif move is LEFT:
             y = y - 1
-            if y < 0:
-                return False
-        elif move == RIGHT:
+        elif move is RIGHT:
             y = y + 1
-            if y >= self.column_num:
-                return False
 
-        # if self.maze[x][y] == '0':
-        if (x, y) in self.visited_spots or self.maze[x][y] == '0':
-            return False
+        # if values are negative or go out of bounds
+        if (x < 0 or x >= self.row_num) or (y < 0 or y >= self.column_num):
+            return
 
-        return x, y
+        # if index is a wall
+        if self.maze[x][y] is '0':
+            return
 
-    def traverse(self):
-        found_path = False
-        x, y = self.find_beginning()
+        new_node = Node((x, y), curr)
 
-        # order determine best to traverse maze
-        # avoid having two opposing directions next to each other
-        set_of_moves = [
-            [RIGHT, DOWN, LEFT, UP], [RIGHT, UP, LEFT, DOWN], [DOWN, RIGHT, UP, LEFT],
-            [LEFT, DOWN, RIGHT, UP], [LEFT, UP, RIGHT, DOWN], [UP, RIGHT, DOWN, LEFT],
-            [DOWN, LEFT, UP, RIGHT], [UP, LEFT, DOWN, RIGHT]
-        ]
+        # see if node is in closed list
+        if self.index(self.closed_spots, new_node):
+            return
 
-        # test each set priority moves
-        for moves in set_of_moves:
-            self.visited_spots.clear()
-            self.visited_spots.append((x, y))
+        # index is valid and not in closed list so add it to neighbor list
+        neighbors.append(new_node)
 
-            # main path finding function
-            found_path = self.search_path(x, y, 0, moves)
-        return found_path
+    def calc_distance(self, n1, n2):
+        # find distance between two nodes
+        return abs(n1.index[0] - n2.index[0]) + abs(n1.index[1] - n2.index[1])
 
-    def search_path(self, x, y, path_length, set_of_moves):
-        # hard copy of set of moves to continue testing this set of direction
-        moves = []
-        for move in set_of_moves:
-            moves.append(move)
-
-        # remove moves that are illegal
-        self.remove_impossible_moves(x, y, moves)
-
-        for move in moves:
-            temp_x, temp_y = self.search_spot(x, y, move)
-
-            # found x so we are finished, extra value needs to be removed from path_length
-            if self.maze[temp_x][temp_y] == 'x':
-                # keep track of shortest path length
-                if self.path_num > path_length:
-                    self.path_num = path_length
-                return True
-
-            # add spot to visited spot array
-            self.visited_spots.append((temp_x, temp_y))
-
-            # continues recursion until 'x marks the stop'
-            if self.search_path(temp_x, temp_y, path_length + 1, set_of_moves):
-                return True
-
-            # taken path was not correct so remove visited spot from array
-            self.visited_spots.remove((temp_x, temp_y))
+    def index(self, list, item):
+        # check the values in item and return that item if it has a match
+        for l in list:
+            if l.index == item.index:
+                return l
         return False
 
-    def print_path_length(self):
-        print(self.path_num)
+    def traverse(self):
+        # find start and end points
+        start_node = Node(self.find_points('begin'))
+        end_node = Node(self.find_points('end'))
+
+        # start node is appended to open list starting the loop
+        self.open_spots.append(start_node)
+
+        while len(self.open_spots) != 0:
+            # find node with smallest f cost
+            curr = self.smallest_distance()
+
+            # remove that node from open list and add it to closed list
+            self.open_spots.remove(curr)
+            self.closed_spots.append(curr)
+            neighbors = []
+
+            if curr.index == end_node.index:
+                # we found the end point
+                current = curr
+
+                # construct the list
+                while current.parent:
+                    self.path.append(current.index)
+                    current = current.parent
+                self.path = self.path[::-1]
+                return True
+            else:
+                # we are not at the end, so we look for neighbors
+                self.find_neighbors(curr, neighbors)
+
+            for n in neighbors:
+                # update current neighbor distance from start
+                n.g = curr.g + 1
+
+                # update current neighbor distance from start + distance from end
+                n.f = n.g + self.calc_distance(n, end_node)
+
+                # see if node is already in open list
+                index = self.index(self.open_spots, n)
+                if index:
+                    if n.f > index.f:
+                        # if node in open list but has higher f cost then ignore current neighbor
+                        continue
+
+                # neighbor either is not in open list or has a shorter f cost we add neighbor
+                self.open_spots.append(n)
+
+    def print_path(self):
+        for p in self.path:
+            print(p)
+        print(len(self.path))
 
 
 if __name__ == "__main__":
     search = Search('maze.txt')
     if search.traverse():
-        search.print_path_length()
+        search.print_path()
     else:
         print("No path exists")
